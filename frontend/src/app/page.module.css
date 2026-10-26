@@ -32,9 +32,17 @@
     display: block;
     position: fixed;
     inset: 0;
-    background-color: rgba(42, 32, 44, 0.5);
-    z-index: 45;
+    background-color: rgba(42, 32, 44, 0.65);
+    backdrop-filter: blur(2px);
+    z-index: 999;
+    cursor: pointer;
+    animation: fadeIn 0.2s ease-out;
   }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 @media (max-width: 480px) {

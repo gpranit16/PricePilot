@@ -2,7 +2,7 @@
 
 import React from 'react';
 import styles from './Sidebar.module.css';
-import { CatalogueIcon, CompetitorIcon, PricingIcon } from './Icons';
+import { CatalogueIcon, CompetitorIcon, PricingIcon, CloseIcon } from './Icons';
 
 export default function Sidebar({ isOpen, onClose, activeTab = 'catalogue', onSelectTab }) {
   const handleNav = (tab) => {
@@ -17,6 +17,14 @@ export default function Sidebar({ isOpen, onClose, activeTab = 'catalogue', onSe
     >
       <div className={styles.brandArea}>
         <h1 className={styles.brandName}>PricePilot</h1>
+        <button
+          type="button"
+          className={styles.closeDrawerButton}
+          onClick={onClose}
+          aria-label="Close navigation menu"
+        >
+          <CloseIcon size={18} />
+        </button>
       </div>
 
       <nav className={styles.navSection}>
