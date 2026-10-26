@@ -193,19 +193,147 @@ export default function CompetitorTrackingView() {
             </p>
           </div>
         ) : (
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th>Your Product</th>
-                <th>Retailer & Listing</th>
-                <th>Competitor Price</th>
-                <th>Source Type</th>
-                <th>Status</th>
-                <th>Last Checked</th>
-                <th style={{ textAlign: 'right' }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
+          <>
+            {/* Desktop Table View */}
+            <div className={styles.desktopTableView}>
+              <table className={styles.table}>
+                <thead>
+                  <tr>
+                    <th>Your Product</th>
+                    <th>Retailer & Listing</th>
+                    <th>Competitor Price</th>
+                    <th>Source Type</th>
+                    <th>Status</th>
+                    <th>Last Checked</th>
+                    <th style={{ textAlign: 'right' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((comp) => {
+                    const isDirect = comp.sourceType === 'direct_scrape';
+                    const isPaused = comp.trackingStatus === 'paused';
+                    const isError = comp.trackingStatus === 'error';
+                    const isScrapingThis = scrapingId === comp._id;
+
+                    return (
+                      <tr key={comp._id} className={styles.tableRow}>
+                        <td>
+                          <div className={styles.productName}>{comp.productInfo?.name}</div>
+                          <span className={styles.productSku}>{comp.productInfo?.sku}</span>
+                        </td>
+
+                        <td>
+                          <div className={styles.merchantTag}>{comp.merchantName}</div>
+                          <div className={styles.competitorTitle} title={comp.externalTitle}>
+                            {comp.externalTitle}
+                          </div>
+                        </td>
+
+                        <td>
+                          <span className={styles.monoPrice}>
+                            {comp.currentPrice
+                              ? `₹${comp.currentPrice.toLocaleString('en-IN')}`
+                              : '—'}
+                          </span>
+                        </td>
+
+                        <td>
+                          <span
+                            className={
+                              isDirect ? styles.sourceBadgeDirect : styles.sourceBadgeSearch
+                            }
+                          >
+                            {isDirect ? 'Verified Scrape' : 'Google Shopping'}
+                          </span>
+                        </td>
+
+                        <td>
+                          {isPaused ? (
+                            <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Paused</span>
+                          ) : isError ? (
+                            <span style={{ fontSize: 11, color: 'var(--status-error)' }} title={comp.lastError}>
+                              Check Error
+                            </span>
+                          ) : (
+                            <span style={{ fontSize: 11, color: 'var(--status-success)', fontWeight: 600 }}>
+                              Active
+                            </span>
+                          )}
+                        </td>
+
+                        <td>
+                          <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                            {comp.lastCheckedAt
+                              ? new Date(comp.lastCheckedAt).toLocaleTimeString([], {
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })
+                              : 'Never'}
+                          </span>
+                        </td>
+
+                        <td style={{ textAlign: 'right' }}>
+                          <div className={styles.actionsGroup} style={{ justifyContent: 'flex-end' }}>
+                            <a
+                              href={comp.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className={styles.iconButton}
+                              title="Open external link"
+                            >
+                              <ExternalLinkIcon size={12} />
+                              <span>Link</span>
+                            </a>
+
+                            <button
+                              type="button"
+                              className={styles.iconButton}
+                              onClick={() => setHistoryCompetitor(comp)}
+                              title="View price history"
+                            >
+                              <HistoryIcon size={13} />
+                              <span>History</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              className={styles.iconButton}
+                              onClick={() => handleToggleStatus(comp)}
+                              title={isPaused ? 'Resume tracking' : 'Pause tracking'}
+                            >
+                              {isPaused ? <PlayIcon size={11} /> : <PauseIcon size={11} />}
+                            </button>
+
+                            <button
+                              type="button"
+                              className={styles.scrapeButton}
+                              onClick={() => handleScrapeNow(comp)}
+                              disabled={isScrapingThis}
+                              title="Extract fresh price directly from page"
+                            >
+                              <RefreshIcon size={12} className={isScrapingThis ? styles.spinning : ''} />
+                              <span>{isScrapingThis ? 'Checking...' : 'Scrape Now'}</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              className={styles.deleteButton}
+                              onClick={() => handleDelete(comp)}
+                              title="Remove competitor link"
+                            >
+                              <TrashIcon size={13} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Responsive Flexbox Cards */}
+            <div className={styles.mobileCardList}>
               {filtered.map((comp) => {
                 const isDirect = comp.sourceType === 'direct_scrape';
                 const isPaused = comp.trackingStatus === 'paused';
@@ -213,120 +341,99 @@ export default function CompetitorTrackingView() {
                 const isScrapingThis = scrapingId === comp._id;
 
                 return (
-                  <tr key={comp._id} className={styles.tableRow}>
-                    <td>
-                      <div className={styles.productName}>{comp.productInfo?.name}</div>
+                  <div key={comp._id} className={styles.mobileCard}>
+                    <div className={styles.mobileCardHeader}>
+                      <div className={styles.mobileCardHeaderLeft}>
+                        <span className={styles.merchantTag}>{comp.merchantName}</span>
+                        <div className={styles.mobileListingTitle}>{comp.externalTitle}</div>
+                      </div>
+                      <div className={styles.mobilePriceTag}>
+                        <div className={styles.monoPrice}>
+                          {comp.currentPrice
+                            ? `₹${comp.currentPrice.toLocaleString('en-IN')}`
+                            : '—'}
+                        </div>
+                        <span className={isDirect ? styles.sourceBadgeDirect : styles.sourceBadgeSearch}>
+                          {isDirect ? 'Verified' : 'Google Shopping'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className={styles.mobileProductRef}>
+                      <span className={styles.productRefLabel}>Tracking for:</span>
+                      <span className={styles.productRefName}>{comp.productInfo?.name}</span>
                       <span className={styles.productSku}>{comp.productInfo?.sku}</span>
-                    </td>
+                    </div>
 
-                    <td>
-                      <div className={styles.merchantTag}>{comp.merchantName}</div>
-                      <div className={styles.competitorTitle} title={comp.externalTitle}>
-                        {comp.externalTitle}
+                    <div className={styles.mobileStatusBar}>
+                      <div className={styles.statusIndicator}>
+                        <span className={styles.statusLabel}>Status: </span>
+                        {isPaused ? (
+                          <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Paused</span>
+                        ) : isError ? (
+                          <span style={{ fontSize: 11, color: 'var(--status-error)' }}>Error</span>
+                        ) : (
+                          <span style={{ fontSize: 11, color: 'var(--status-success)', fontWeight: 600 }}>Active</span>
+                        )}
                       </div>
-                    </td>
+                      <div className={styles.lastCheckedText}>
+                        Checked: {comp.lastCheckedAt ? new Date(comp.lastCheckedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Never'}
+                      </div>
+                    </div>
 
-                    <td>
-                      <span className={styles.monoPrice}>
-                        {comp.currentPrice
-                          ? `₹${comp.currentPrice.toLocaleString('en-IN')}`
-                          : '—'}
-                      </span>
-                    </td>
-
-                    <td>
-                      <span
-                        className={
-                          isDirect ? styles.sourceBadgeDirect : styles.sourceBadgeSearch
-                        }
+                    <div className={styles.mobileActions}>
+                      <button
+                        type="button"
+                        className={styles.mobileScrapeAction}
+                        onClick={() => handleScrapeNow(comp)}
+                        disabled={isScrapingThis}
                       >
-                        {isDirect ? 'Verified Scrape' : 'Google Shopping'}
-                      </span>
-                    </td>
+                        <RefreshIcon size={12} className={isScrapingThis ? styles.spinning : ''} />
+                        <span>{isScrapingThis ? 'Checking...' : 'Scrape Now'}</span>
+                      </button>
 
-                    <td>
-                      {isPaused ? (
-                        <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Paused</span>
-                      ) : isError ? (
-                        <span style={{ fontSize: 11, color: 'var(--status-error)' }} title={comp.lastError}>
-                          Check Error
-                        </span>
-                      ) : (
-                        <span style={{ fontSize: 11, color: 'var(--status-success)', fontWeight: 600 }}>
-                          Active
-                        </span>
-                      )}
-                    </td>
+                      <button
+                        type="button"
+                        className={styles.mobileSecondaryAction}
+                        onClick={() => setHistoryCompetitor(comp)}
+                      >
+                        <HistoryIcon size={12} />
+                        <span>History</span>
+                      </button>
 
-                    <td>
-                      <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                        {comp.lastCheckedAt
-                          ? new Date(comp.lastCheckedAt).toLocaleTimeString([], {
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            })
-                          : 'Never'}
-                      </span>
-                    </td>
+                      <a
+                        href={comp.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={styles.mobileSecondaryAction}
+                      >
+                        <ExternalLinkIcon size={12} />
+                        <span>Link</span>
+                      </a>
 
-                    <td style={{ textAlign: 'right' }}>
-                      <div className={styles.actionsGroup} style={{ justifyContent: 'flex-end' }}>
-                        <a
-                          href={comp.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className={styles.iconButton}
-                          title="Open external link"
-                        >
-                          <ExternalLinkIcon size={12} />
-                          <span>Link</span>
-                        </a>
+                      <button
+                        type="button"
+                        className={styles.mobileIconAction}
+                        onClick={() => handleToggleStatus(comp)}
+                        title={isPaused ? 'Resume tracking' : 'Pause tracking'}
+                      >
+                        {isPaused ? <PlayIcon size={12} /> : <PauseIcon size={12} />}
+                      </button>
 
-                        <button
-                          type="button"
-                          className={styles.iconButton}
-                          onClick={() => setHistoryCompetitor(comp)}
-                          title="View price history"
-                        >
-                          <HistoryIcon size={13} />
-                          <span>History</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          className={styles.iconButton}
-                          onClick={() => handleToggleStatus(comp)}
-                          title={isPaused ? 'Resume tracking' : 'Pause tracking'}
-                        >
-                          {isPaused ? <PlayIcon size={11} /> : <PauseIcon size={11} />}
-                        </button>
-
-                        <button
-                          type="button"
-                          className={styles.scrapeButton}
-                          onClick={() => handleScrapeNow(comp)}
-                          disabled={isScrapingThis}
-                          title="Extract fresh price directly from page"
-                        >
-                          <RefreshIcon size={12} className={isScrapingThis ? styles.spinning : ''} />
-                          <span>{isScrapingThis ? 'Checking...' : 'Scrape Now'}</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          className={styles.deleteButton}
-                          onClick={() => handleDelete(comp)}
-                          title="Remove competitor link"
-                        >
-                          <TrashIcon size={13} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
+                      <button
+                        type="button"
+                        className={styles.mobileDeleteAction}
+                        onClick={() => handleDelete(comp)}
+                        title="Delete"
+                      >
+                        <TrashIcon size={12} />
+                      </button>
+                    </div>
+                  </div>
                 );
               })}
-            </tbody>
-          </table>
+            </div>
+          </>
         )}
       </div>
 

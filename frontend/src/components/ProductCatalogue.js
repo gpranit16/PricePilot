@@ -394,19 +394,158 @@ WATCH-CHR-SLV,Minimalist Chronograph Watch,2100,4500,AuraTime,Accessories,https:
             </div>
           </div>
         ) : (
-          <table className={styles.productTable}>
-            <thead>
-              <tr>
-                <th style={{ width: 60 }}>Image</th>
-                <th>Product Name & Brand</th>
-                <th>SKU</th>
-                <th>Cost Price</th>
-                <th>Selling Price</th>
-                <th>Gross Margin</th>
-                <th style={{ textAlign: 'right' }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
+          <>
+            {/* Desktop Table View */}
+            <div className={styles.desktopTableView}>
+              <table className={styles.productTable}>
+                <thead>
+                  <tr>
+                    <th style={{ width: 60 }}>Image</th>
+                    <th>Product Name & Brand</th>
+                    <th>SKU</th>
+                    <th>Cost Price</th>
+                    <th>Selling Price</th>
+                    <th>Gross Margin</th>
+                    <th style={{ textAlign: 'right' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {products.map((product) => {
+                    const cost = product.costPrice || 0;
+                    const selling = product.sellingPrice || 0;
+                    const marginPercent =
+                      selling > 0 ? Math.round(((selling - cost) / selling) * 1000) / 10 : 0;
+                    const isHealthy = marginPercent >= 25;
+
+                    return (
+                      <tr key={product._id} className={styles.tableRow}>
+                        <td>
+                          <div className={styles.thumbnailWrapper}>
+                            {product.imageUrl ? (
+                              <>
+                                <img
+                                  src={product.imageUrl}
+                                  alt={product.name}
+                                  className={styles.thumbnailImg}
+                                  onError={(e) => {
+                                    e.currentTarget.style.display = 'none';
+                                    if (e.currentTarget.nextSibling) {
+                                      e.currentTarget.nextSibling.style.display = 'flex';
+                                    }
+                                  }}
+                                />
+                                <div
+                                  className={styles.thumbnailPlaceholder}
+                                  style={{ display: 'none' }}
+                                >
+                                  <ImageIcon size={18} />
+                                </div>
+                              </>
+                            ) : (
+                              <div className={styles.thumbnailPlaceholder}>
+                                <ImageIcon size={18} />
+                              </div>
+                            )}
+                          </div>
+                        </td>
+
+                        <td>
+                          <div className={styles.nameCell}>
+                            <div>
+                              <div className={styles.productTitle}>{product.name}</div>
+                              <div className={styles.productMeta}>
+                                {product.brand ? `${product.brand} • ` : ''}
+                                {product.category || 'General'}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+
+                        <td>
+                          <span className={styles.skuCode}>{formatSku(product.sku)}</span>
+                        </td>
+
+                        <td>
+                          <span className={styles.monoPrice}>
+                            ₹{cost.toLocaleString('en-IN')}
+                          </span>
+                        </td>
+
+                        <td>
+                          <span className={styles.monoPrice} style={{ fontWeight: 600 }}>
+                            ₹{selling.toLocaleString('en-IN')}
+                          </span>
+                        </td>
+
+                        <td>
+                          <span
+                            className={`
+                              ${styles.marginBadge}
+                              ${isHealthy ? styles.marginHealthy : styles.marginThin}
+                            `}
+                          >
+                            {marginPercent}%
+                          </span>
+                        </td>
+
+                        <td style={{ textAlign: 'right' }}>
+                          <div
+                            className={styles.actionButtonGroup}
+                            style={{ justifyContent: 'flex-end', flexWrap: 'wrap', gap: 6 }}
+                          >
+                            <button
+                              type="button"
+                              className={styles.actionButton}
+                              style={{
+                                borderColor: 'var(--accent-primary)',
+                                color: 'var(--accent-primary)',
+                                fontWeight: 600,
+                                backgroundColor: 'rgba(123, 60, 89, 0.05)'
+                              }}
+                              onClick={() => setDiscoveryProduct(product)}
+                              title="Discover Competitors on Google Shopping"
+                            >
+                              <SearchIcon size={13} />
+                              <span>Find Competitors</span>
+                            </button>
+                            <button
+                              type="button"
+                              className={styles.actionButton}
+                              onClick={() => setViewCompetitorsProduct(product)}
+                              title="View & manage tracked competitors"
+                            >
+                              <CompetitorIcon size={13} />
+                              <span>Competitors</span>
+                            </button>
+                            <button
+                              type="button"
+                              className={styles.actionButton}
+                              onClick={() => openFormModal(product)}
+                              title="Edit Product"
+                            >
+                              <EditIcon size={13} />
+                              <span>Edit</span>
+                            </button>
+                            <button
+                              type="button"
+                              className={styles.deleteButton}
+                              onClick={() => setDeletingProduct(product)}
+                              title="Delete Product"
+                            >
+                              <TrashIcon size={13} />
+                              <span>Delete</span>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Responsive Flexbox Card View */}
+            <div className={styles.mobileCardList}>
               {products.map((product) => {
                 const cost = product.costPrice || 0;
                 const selling = product.sellingPrice || 0;
@@ -415,8 +554,8 @@ WATCH-CHR-SLV,Minimalist Chronograph Watch,2100,4500,AuraTime,Accessories,https:
                 const isHealthy = marginPercent >= 25;
 
                 return (
-                  <tr key={product._id} className={styles.tableRow}>
-                    <td>
+                  <div key={product._id} className={styles.mobileCard}>
+                    <div className={styles.mobileCardTop}>
                       <div className={styles.thumbnailWrapper}>
                         {product.imageUrl ? (
                           <>
@@ -444,101 +583,78 @@ WATCH-CHR-SLV,Minimalist Chronograph Watch,2100,4500,AuraTime,Accessories,https:
                           </div>
                         )}
                       </div>
-                    </td>
-
-                    <td>
-                      <div className={styles.nameCell}>
-                        <div>
-                          <div className={styles.productTitle}>{product.name}</div>
-                          <div className={styles.productMeta}>
-                            {product.brand ? `${product.brand} • ` : ''}
-                            {product.category || 'General'}
-                          </div>
+                      <div className={styles.mobileCardInfo}>
+                        <div className={styles.productTitle}>{product.name}</div>
+                        <div className={styles.productMeta}>
+                          {product.brand ? `${product.brand} • ` : ''}
+                          {product.category || 'General'}
                         </div>
                       </div>
-                    </td>
-
-                    <td>
                       <span className={styles.skuCode}>{formatSku(product.sku)}</span>
-                    </td>
+                    </div>
 
-                    <td>
-                      <span className={styles.monoPrice}>
-                        ₹{cost.toLocaleString('en-IN')}
-                      </span>
-                    </td>
-
-                    <td>
-                      <span className={styles.monoPrice} style={{ fontWeight: 600 }}>
-                        ₹{selling.toLocaleString('en-IN')}
-                      </span>
-                    </td>
-
-                    <td>
-                      <span
-                        className={`
-                          ${styles.marginBadge}
-                          ${isHealthy ? styles.marginHealthy : styles.marginThin}
-                        `}
-                      >
-                        {marginPercent}%
-                      </span>
-                    </td>
-
-                    <td style={{ textAlign: 'right' }}>
-                      <div
-                        className={styles.actionButtonGroup}
-                        style={{ justifyContent: 'flex-end', flexWrap: 'wrap', gap: 6 }}
-                      >
-                        <button
-                          type="button"
-                          className={styles.actionButton}
-                          style={{
-                            borderColor: 'var(--accent-primary)',
-                            color: 'var(--accent-primary)',
-                            fontWeight: 600,
-                            backgroundColor: 'rgba(123, 60, 89, 0.05)'
-                          }}
-                          onClick={() => setDiscoveryProduct(product)}
-                          title="Discover Competitors on Google Shopping"
-                        >
-                          <SearchIcon size={13} />
-                          <span>Find Competitors</span>
-                        </button>
-                        <button
-                          type="button"
-                          className={styles.actionButton}
-                          onClick={() => setViewCompetitorsProduct(product)}
-                          title="View & manage tracked competitors"
-                        >
-                          <CompetitorIcon size={13} />
-                          <span>Competitors</span>
-                        </button>
-                        <button
-                          type="button"
-                          className={styles.actionButton}
-                          onClick={() => openFormModal(product)}
-                          title="Edit Product"
-                        >
-                          <EditIcon size={13} />
-                          <span>Edit</span>
-                        </button>
-                        <button
-                          type="button"
-                          className={styles.deleteButton}
-                          onClick={() => setDeletingProduct(product)}
-                          title="Delete Product"
-                        >
-                          <TrashIcon size={13} />
-                          <span>Delete</span>
-                        </button>
+                    <div className={styles.mobilePriceStrip}>
+                      <div className={styles.priceStat}>
+                        <span className={styles.statLabel}>Cost</span>
+                        <span className={styles.statValue}>₹{cost.toLocaleString('en-IN')}</span>
                       </div>
-                    </td>
-                  </tr>
+                      <div className={styles.priceStat}>
+                        <span className={styles.statLabel}>Selling</span>
+                        <span className={styles.statValueHighlight}>₹{selling.toLocaleString('en-IN')}</span>
+                      </div>
+                      <div className={styles.priceStat}>
+                        <span className={styles.statLabel}>Margin</span>
+                        <span
+                          className={`
+                            ${styles.marginBadge}
+                            ${isHealthy ? styles.marginHealthy : styles.marginThin}
+                          `}
+                        >
+                          {marginPercent}%
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className={styles.mobileActions}>
+                      <button
+                        type="button"
+                        className={styles.mobilePrimaryAction}
+                        onClick={() => setDiscoveryProduct(product)}
+                      >
+                        <SearchIcon size={14} />
+                        <span>Find Competitors</span>
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.mobileSecondaryAction}
+                        onClick={() => setViewCompetitorsProduct(product)}
+                      >
+                        <CompetitorIcon size={14} />
+                        <span>Competitors</span>
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.mobileIconAction}
+                        onClick={() => openFormModal(product)}
+                        title="Edit Product"
+                      >
+                        <EditIcon size={14} />
+                        <span>Edit</span>
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.mobileDeleteAction}
+                        onClick={() => setDeletingProduct(product)}
+                        title="Delete Product"
+                      >
+                        <TrashIcon size={14} />
+                      </button>
+                    </div>
+                  </div>
                 );
               })}
-            </tbody>
-          </table>
+            </div>
+          </>
         )}
       </div>
 
