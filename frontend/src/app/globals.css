@@ -1,0 +1,129 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&family=Instrument+Serif:ital@0;1&family=Manrope:wght@300;400;500;600;700&display=swap');
+
+:root {
+  /* Rosewood Editorial Palette */
+  --bg-main: #F0E7EB;          /* Muted pink-grey main canvas */
+  --bg-card: #FBF7F8;          /* Warm off-white content surfaces */
+  --bg-card-subtle: #F5EEF1;   /* Subtle inner card surfaces */
+  --bg-sidebar: #2A202C;       /* Dark plum sidebar */
+  --sidebar-hover: #372A39;    /* Elevated plum on hover */
+  --sidebar-active: #48344B;   /* Active menu selection */
+  --sidebar-border: #3D2F40;   /* Muted plum border */
+
+  /* Text & Content Tokens */
+  --text-primary: #2E2530;     /* Deep charcoal plum */
+  --text-secondary: #766874;   /* Balanced muted mauve-slate */
+  --text-tertiary: #9B8C99;    /* Dim footnote / hint text */
+  --text-on-dark: #FBF7F8;     /* Off-white text for dark plum surfaces */
+  --text-muted-dark: #B3A4B1;  /* Muted secondary text on dark surfaces */
+
+  /* Accents & Brand Signals */
+  --accent-primary: #7B3C59;   /* Deep Wine */
+  --accent-primary-hover: #632D45;
+  --accent-soft: #D5A1B2;      /* Soft Rose Accent */
+  --accent-soft-bg: rgba(213, 161, 178, 0.18);
+  --accent-soft-border: rgba(213, 161, 178, 0.35);
+  --border-color: #DED0D9;     /* Subtle warm border */
+  --border-subtle: #EBE0E6;    /* Very light divider */
+  --accent-gold: #B69A6A;      /* Restrained decorative accent */
+  --accent-gold-bg: rgba(182, 154, 106, 0.12);
+
+  /* Status Colors (Semantic & High Contrast) */
+  --status-success: #2A7536;
+  --status-success-bg: #E8F4EA;
+  --status-success-border: #BCE2C3;
+  --status-warning: #B7670A;
+  --status-warning-bg: #FEF6E8;
+  --status-warning-border: #FCE1B3;
+  --status-error: #B72B2B;
+  --status-error-bg: #FEEEEE;
+  --status-error-border: #F9C3C3;
+  --status-info: #3E6389;
+  --status-info-bg: #EDF3FA;
+  --status-info-border: #C8DBEE;
+
+  /* Typography */
+  --font-heading: 'Instrument Serif', Georgia, serif;
+  --font-body: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'IBM Plex Mono', Consolas, monospace;
+
+  /* Shadows & Elevation */
+  --shadow-xs: 0 1px 2px rgba(46, 37, 48, 0.04);
+  --shadow-sm: 0 1px 3px rgba(46, 37, 48, 0.06), 0 1px 2px rgba(46, 37, 48, 0.04);
+  --shadow-md: 0 4px 6px -1px rgba(46, 37, 48, 0.08), 0 2px 4px -1px rgba(46, 37, 48, 0.04);
+  --shadow-lg: 0 10px 15px -3px rgba(46, 37, 48, 0.09), 0 4px 6px -2px rgba(46, 37, 48, 0.05);
+
+  /* Radii */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+  --radius-full: 9999px;
+
+  /* Transitions */
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* CSS Reset & Global Baseline */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+  font-family: var(--font-body);
+  background-color: var(--bg-main);
+  color: var(--text-primary);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Keyboard accessibility outline */
+:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+/* Headings font inheritance */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+  font-weight: 400;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+
+/* Code and numbers font */
+code, pre, .mono-data {
+  font-family: var(--font-mono);
+}
+
+/* Buttons and interactive elements */
+button, input, select, textarea {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  background: none;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

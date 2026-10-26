@@ -1,0 +1,79 @@
+.sidebar {
+  width: 220px;
+  background-color: var(--bg-sidebar);
+  color: var(--text-on-dark);
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  position: sticky;
+  top: 0;
+  border-right: 1px solid var(--sidebar-border);
+  z-index: 50;
+  flex-shrink: 0;
+  transition: transform var(--transition-normal);
+}
+
+.brandArea {
+  padding: 24px 20px;
+  border-bottom: 1px solid var(--sidebar-border);
+}
+
+.brandName {
+  font-family: var(--font-heading);
+  font-size: 22px;
+  font-weight: 400;
+  color: #FFFFFF;
+  letter-spacing: 0.01em;
+  line-height: 1;
+}
+
+.navSection {
+  flex: 1;
+  padding: 16px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.navItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  color: var(--text-muted-dark);
+  background-color: transparent;
+  font-size: 13.5px;
+  font-weight: 500;
+  border: none;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.navItem:hover {
+  background-color: var(--sidebar-hover);
+  color: #FFFFFF;
+}
+
+.navItemActive {
+  background-color: var(--sidebar-active);
+  color: #FFFFFF;
+  font-weight: 600;
+  border-left: 3px solid var(--accent-soft);
+}
+
+/* Mobile responsive drawer */
+@media (max-width: 768px) {
+  .sidebar {
+    position: fixed;
+    transform: translateX(-100%);
+    width: 240px;
+  }
+
+  .sidebarOpen {
+    transform: translateX(0);
+    box-shadow: var(--shadow-lg);
+  }
+}
