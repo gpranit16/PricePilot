@@ -99,10 +99,14 @@ export default function CompetitorDiscoveryModal({ product, onClose, onCompetito
           externalTitle: candidate.title,
           url: candidate.url,
           imageUrl: candidate.imageUrl || '',
-          currentPrice: candidate.price,
+          currentPrice: candidate.sellingPrice || candidate.price,
+          sellingPrice: candidate.sellingPrice || candidate.price,
+          originalPrice: candidate.originalPrice || null,
           currency: candidate.currency || 'INR',
           sourceType: 'search_result',
-          matchConfidence: candidate.matchQuality || 'moderate'
+          priceVerificationStatus: 'unverified',
+          matchQuality: candidate.aiMatch?.decision || candidate.matchQuality || 'moderate',
+          aiMatch: candidate.aiMatch || undefined
         })
       });
 
@@ -290,13 +294,36 @@ export default function CompetitorDiscoveryModal({ product, onClose, onCompetito
                   const isTracked = cand.isAlreadyTracked || trackedSuccessMap[idx];
                   const isTrackingThis = trackingLoadingMap[idx];
                   const isBroken = Boolean(cand.isBroken);
+                  const ai = cand.aiMatch;
+                  const isMismatch = ai?.decision === 'mismatch';
+                  const isAccessory = ai?.decision === 'accessory';
 
-                  // Match badge styling based on evaluated confidence
-                  let badgeClass = styles.qualityBadgeMod;
-                  if (cand.matchQuality === 'exact') badgeClass = styles.qualityBadgeExact;
-                  else if (cand.matchQuality === 'high') badgeClass = styles.qualityBadgeHigh;
-                  else if (cand.matchQuality === 'partial') badgeClass = styles.qualityBadgePartial;
-                  else if (cand.matchQuality === 'mismatch') badgeClass = styles.qualityBadgeMismatch;
+                  // Match badge styling based on evaluated confidence or AI decision
+                  let badgeElement = null;
+                  if (ai) {
+                    if (ai.decision === 'exact_match') {
+                      badgeElement = <span className={styles.badgeExactMatch}>✓ Exact Match ({ai.confidence}%)</span>;
+                    } else if (ai.decision === 'variant_match') {
+                      badgeElement = <span className={styles.badgeVariantMatch}>⚠️ Variant Match ({ai.confidence}%)</span>;
+                    } else if (ai.decision === 'accessory') {
+                      badgeElement = <span className={styles.badgeAccessory}>🚫 Accessory ({ai.confidence}%)</span>;
+                    } else if (ai.decision === 'mismatch') {
+                      badgeElement = <span className={styles.badgeMismatch}>✕ Mismatch ({ai.confidence}%)</span>;
+                    } else {
+                      badgeElement = <span className={styles.badgeNeedsReview}>🔍 Needs Review ({ai.confidence}%)</span>;
+                    }
+                  } else {
+                    let badgeClass = styles.qualityBadgeMod;
+                    if (cand.matchQuality === 'exact') badgeClass = styles.qualityBadgeExact;
+                    else if (cand.matchQuality === 'high') badgeClass = styles.qualityBadgeHigh;
+                    else if (cand.matchQuality === 'partial') badgeClass = styles.qualityBadgePartial;
+                    else if (cand.matchQuality === 'mismatch') badgeClass = styles.qualityBadgeMismatch;
+                    badgeElement = (
+                      <span className={badgeClass}>
+                        {cand.matchLabel || (cand.matchQuality === 'exact' ? 'Exact Match' : 'High Match')}
+                      </span>
+                    );
+                  }
 
                   return (
                     <div
@@ -336,15 +363,36 @@ export default function CompetitorDiscoveryModal({ product, onClose, onCompetito
                         {/* Merchant & Match Quality Row */}
                         <div className={styles.candidateMerchantRow}>
                           <span className={styles.merchantName}>{cand.merchantName}</span>
-                          <span className={badgeClass}>
-                            {cand.matchLabel || (cand.matchQuality === 'exact' ? 'Exact Match' : 'High Match')}
-                          </span>
+                          {badgeElement}
                         </div>
 
                         {/* Candidate Title */}
                         <div className={styles.candidateTitle} title={cand.title}>
                           {cand.title}
                         </div>
+
+                        {/* AI Match Analysis Box */}
+                        {ai && (
+                          <div className={styles.aiAnalysisBox}>
+                            <div className={styles.aiAnalysisHeader}>
+                              <span className={styles.aiHeaderTitle}>
+                                ✨ AI Match Analysis • {ai.source === 'gemini' ? 'Gemini 2.5' : 'Smart Rules'}
+                              </span>
+                              <span className={styles.aiConfidenceScore}>{ai.confidence}% Confidence</span>
+                            </div>
+                            <div className={styles.aiReasonText}>{ai.reason}</div>
+                            {(ai.matchedAttributes?.length > 0 || ai.mismatchedAttributes?.length > 0) && (
+                              <div className={styles.aiAttributeList}>
+                                {ai.matchedAttributes?.map((attr, i) => (
+                                  <span key={`m-${i}`} className={styles.attrPillMatch}>✓ {attr}</span>
+                                ))}
+                                {ai.mismatchedAttributes?.map((attr, i) => (
+                                  <span key={`mm-${i}`} className={styles.attrPillMismatch}>✕ {attr}</span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
 
                         {/* Metadata badges row */}
                         <div className={styles.badgeRow}>
@@ -371,12 +419,19 @@ export default function CompetitorDiscoveryModal({ product, onClose, onCompetito
                         {/* Bottom Row: Price with Source Note & Action Buttons */}
                         <div className={styles.candidateBottomRow}>
                           <div className={styles.priceContainer}>
-                            <span className={styles.candidatePrice}>
-                              {cand.price
-                                ? `₹${cand.price.toLocaleString('en-IN')}`
-                                : 'Price unlisted'}
-                            </span>
-                            <span className={styles.priceSourceNote}>Search-result price</span>
+                            <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                              <span className={styles.candidatePrice}>
+                                {cand.sellingPrice || cand.price
+                                  ? `₹${(cand.sellingPrice || cand.price).toLocaleString('en-IN')}`
+                                  : 'Price unlisted'}
+                              </span>
+                              {cand.originalPrice && cand.originalPrice > (cand.sellingPrice || cand.price) && (
+                                <span style={{ fontSize: 11, color: 'var(--text-secondary)', textDecoration: 'line-through' }}>
+                                  MRP: ₹{cand.originalPrice.toLocaleString('en-IN')}
+                                </span>
+                              )}
+                            </div>
+                            <span className={styles.priceSourceNote}>Unverified Search Estimate</span>
                           </div>
 
                           <div className={styles.candidateActions}>
@@ -409,6 +464,24 @@ export default function CompetitorDiscoveryModal({ product, onClose, onCompetito
                               >
                                 <span>Broken URL</span>
                               </button>
+                            ) : isMismatch ? (
+                              <button
+                                type="button"
+                                className={styles.trackButtonDisabled}
+                                disabled
+                                title="Mismatched product cannot be tracked against this catalogue item"
+                              >
+                                <span>Blocked (Mismatch)</span>
+                              </button>
+                            ) : isAccessory ? (
+                              <button
+                                type="button"
+                                className={styles.trackButtonDisabled}
+                                disabled
+                                title="Accessories cannot be tracked against core products"
+                              >
+                                <span>Blocked (Accessory)</span>
+                              </button>
                             ) : (
                               <button
                                 type="button"
@@ -417,7 +490,13 @@ export default function CompetitorDiscoveryModal({ product, onClose, onCompetito
                                 disabled={isTrackingThis}
                               >
                                 <PlusIcon size={13} />
-                                <span>{isTrackingThis ? 'Saving...' : 'Confirm & Track'}</span>
+                                <span>
+                                  {isTrackingThis
+                                    ? 'Saving...'
+                                    : ai?.decision === 'variant_match'
+                                    ? 'Review & Track'
+                                    : 'Confirm & Track'}
+                                </span>
                               </button>
                             )}
                           </div>

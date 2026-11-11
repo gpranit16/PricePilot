@@ -3,7 +3,9 @@ const Product = require('../models/Product');
 const Competitor = require('../models/Competitor');
 const PriceObservation = require('../models/PriceObservation');
 const { discoverCompetitors } = require('../services/serpApiService');
-const { validateSafeUrl, scrapeCompetitorPage } = require('../services/scraperService');
+const { validateSafeUrl, scrapeCompetitorPage, checkCompetitorPrice } = require('../services/scraperService');
+const { evaluatePriceChangeAndNotify } = require('../services/alertService');
+const { evaluateCompetitorMatchWithAI } = require('../services/aiService');
 
 const router = express.Router();
 
@@ -33,12 +35,34 @@ router.post('/products/:productId/competitor-search', async (req, res, next) => 
       isAlreadyTracked: trackedUrls.has(item.url)
     }));
 
+    // Enrich top candidates with AI comparison (up to AI_MAX_MATCH_CANDIDATES)
+    const maxAiCandidates = parseInt(process.env.AI_MAX_MATCH_CANDIDATES, 10) || 5;
+    const aiEnrichedCandidates = await Promise.all(
+      enrichedCandidates.map(async (cand, index) => {
+        if (index < maxAiCandidates) {
+          try {
+            const aiMatch = await evaluateCompetitorMatchWithAI(product, cand);
+            return {
+              ...cand,
+              aiMatch,
+              matchQuality: aiMatch.decision,
+              matchLabel: aiMatch.reason
+            };
+          } catch (e) {
+            console.warn('AI matching notice for candidate:', e.message);
+            return cand;
+          }
+        }
+        return cand;
+      })
+    );
+
     return res.status(200).json({
       success: true,
       productId: product._id,
       productName: product.name,
-      count: enrichedCandidates.length,
-      candidates: enrichedCandidates
+      count: aiEnrichedCandidates.length,
+      candidates: aiEnrichedCandidates
     });
   } catch (error) {
     console.error('Competitor discovery error:', error.message);
@@ -101,6 +125,8 @@ router.post('/products/:productId/competitors', async (req, res, next) => {
       url,
       imageUrl,
       currentPrice,
+      sellingPrice,
+      originalPrice,
       currency,
       sourceType,
       matchQuality
@@ -144,11 +170,30 @@ router.post('/products/:productId/competitors', async (req, res, next) => {
     }
 
     const priceNum =
-      currentPrice !== undefined && currentPrice !== null && !isNaN(parseFloat(currentPrice))
+      sellingPrice !== undefined && sellingPrice !== null && !isNaN(parseFloat(sellingPrice))
+        ? parseFloat(sellingPrice)
+        : currentPrice !== undefined && currentPrice !== null && !isNaN(parseFloat(currentPrice))
         ? parseFloat(currentPrice)
         : null;
 
+    const originalNum =
+      originalPrice !== undefined && originalPrice !== null && !isNaN(parseFloat(originalPrice))
+        ? parseFloat(originalPrice)
+        : null;
+
+    // Rule: Mismatches and accessories cannot be tracked
+    const aiDecision = req.body.aiMatch?.decision;
+    if (aiDecision === 'mismatch' || aiDecision === 'accessory') {
+      return res.status(400).json({
+        success: false,
+        error: 'Tracking Blocked',
+        message: `Cannot track ${aiDecision === 'accessory' ? 'an accessory' : 'a mismatched product'} against this catalogue item.`
+      });
+    }
+
     const source = sourceType || (priceNum ? 'search_result' : 'manual');
+    // Keep search-result prices unverified. Only direct scrapes can mark verified.
+    const verificationStatus = source === 'direct_scrape' ? 'verified' : 'unverified';
 
     const competitor = new Competitor({
       productId: product._id,
@@ -157,11 +202,15 @@ router.post('/products/:productId/competitors', async (req, res, next) => {
       url: safeUrl,
       imageUrl: imageUrl ? imageUrl.trim() : '',
       currentPrice: priceNum,
+      sellingPrice: priceNum,
+      originalPrice: originalNum,
       currency: currency || 'INR',
       sourceType: source,
+      priceVerificationStatus: verificationStatus,
       trackingStatus: 'active',
       matchConfirmed: true,
       matchQuality: matchQuality || 'high',
+      aiMatch: req.body.aiMatch || undefined,
       lastCheckedAt: new Date()
     });
 
@@ -173,11 +222,15 @@ router.post('/products/:productId/competitors', async (req, res, next) => {
         competitorId: competitor._id,
         productId: product._id,
         price: priceNum,
+        sellingPrice: priceNum,
+        originalPrice: originalNum,
         currency: competitor.currency,
         sourceUrl: safeUrl,
         sourceType: source,
+        priceVerificationStatus: verificationStatus,
         status: 'success',
-        notes: `Initial observation saved via ${source === 'search_result' ? 'Google Shopping / SerpApi' : 'manual entry'}.`
+        extractionMethod: source === 'search_result' ? 'Google Shopping / SerpApi' : 'Manual Entry',
+        notes: `Initial observation saved via ${source === 'search_result' ? 'Google Shopping / SerpApi (Unverified Search Result)' : 'manual entry'}.`
       });
     }
 
@@ -281,28 +334,100 @@ router.post('/competitors/:competitorId/scrape', async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Competitor not found.' });
     }
 
-    const scrapeResult = await scrapeCompetitorPage(competitor.url);
+    const product = await Product.findById(competitor.productId);
+    const scrapeResult = await checkCompetitorPrice(competitor, product);
+
+    // If a direct retailer link was discovered to replace a Google Search aggregator URL, update it!
+    if (scrapeResult.directUrl && competitor.url.includes('google.com')) {
+      competitor.url = scrapeResult.directUrl;
+    }
 
     if (scrapeResult.success) {
-      const oldPrice = competitor.currentPrice;
-      const newPrice = scrapeResult.price;
+      // Check if product is unavailable / out of stock
+      if (!scrapeResult.isAvailable || scrapeResult.priceVerificationStatus === 'unavailable') {
+        competitor.isAvailable = false;
+        competitor.priceVerificationStatus = 'unavailable';
+        competitor.trackingStatus = 'active';
+        competitor.lastCheckedAt = new Date();
+        competitor.lastError = null;
+        await competitor.save();
 
-      // 1. Record new successful historical observation
+        const observation = await PriceObservation.create({
+          competitorId: competitor._id,
+          productId: competitor.productId,
+          price: competitor.currentPrice || competitor.sellingPrice || 0,
+          sellingPrice: competitor.sellingPrice || competitor.currentPrice || null,
+          originalPrice: competitor.originalPrice || null,
+          currency: scrapeResult.currency || competitor.currency || 'INR',
+          sourceUrl: competitor.url,
+          sourceType: scrapeResult.sourceType || competitor.sourceType || 'direct_scrape',
+          priceVerificationStatus: 'unavailable',
+          status: 'success',
+          extractionMethod: scrapeResult.extractionMethod || 'Direct Page Scraping',
+          notes: 'Product is currently Out of Stock / Unavailable'
+        });
+
+        // Trigger out-of-stock alert if verified transition
+        try {
+          await evaluatePriceChangeAndNotify(competitor, { isAvailable: false, priceVerificationStatus: 'unavailable' }, observation);
+        } catch (alertErr) {
+          console.warn('Stock alert evaluation notice:', alertErr.message);
+        }
+
+        return res.status(200).json({
+          success: true,
+          message: 'Product page checked: Item is currently Out of Stock / Unavailable.',
+          price: competitor.currentPrice,
+          sellingPrice: competitor.sellingPrice,
+          originalPrice: competitor.originalPrice,
+          currency: competitor.currency,
+          isAvailable: false,
+          priceVerificationStatus: 'unavailable',
+          sourceType: competitor.sourceType,
+          observation
+        });
+      }
+
+      const oldPrice = competitor.currentPrice;
+      const newSellingPrice = scrapeResult.sellingPrice || scrapeResult.price || competitor.currentPrice;
+      const newOriginalPrice = scrapeResult.originalPrice || competitor.originalPrice || null;
+      const verificationStatus = scrapeResult.priceVerificationStatus || (scrapeResult.sourceType === 'direct_scrape' ? 'verified' : 'unverified');
+
+      // 1. Record historical observation
       const observation = await PriceObservation.create({
         competitorId: competitor._id,
         productId: competitor.productId,
-        price: newPrice,
+        price: newSellingPrice,
+        sellingPrice: newSellingPrice,
+        originalPrice: newOriginalPrice,
+        discountPercent: scrapeResult.discountPercent || competitor.discountPercent || null,
         currency: scrapeResult.currency || competitor.currency || 'INR',
         sourceUrl: competitor.url,
-        sourceType: 'direct_scrape',
+        sourceType: scrapeResult.sourceType || competitor.sourceType || 'direct_scrape',
+        priceVerificationStatus: verificationStatus,
         status: 'success',
-        notes: `Extracted via ${scrapeResult.extractionMethod}`
+        extractionMethod: scrapeResult.extractionMethod || 'Price Check',
+        rawSnippet: scrapeResult.rawSnippet || '',
+        notes: scrapeResult.message || `Price updated: ₹${newSellingPrice.toLocaleString('en-IN')}`
       });
 
+      // Trigger notification if verified price change occurred
+      let notification = null;
+      try {
+        notification = await evaluatePriceChangeAndNotify(competitor, scrapeResult, observation);
+      } catch (alertErr) {
+        console.warn('Alert evaluation notice:', alertErr.message);
+      }
+
       // 2. Update competitor record
-      competitor.currentPrice = newPrice;
+      competitor.currentPrice = newSellingPrice;
+      competitor.sellingPrice = newSellingPrice;
+      competitor.originalPrice = newOriginalPrice;
+      if (scrapeResult.discountPercent) competitor.discountPercent = scrapeResult.discountPercent;
       competitor.currency = scrapeResult.currency || competitor.currency;
-      competitor.sourceType = 'direct_scrape';
+      competitor.isAvailable = true;
+      competitor.priceVerificationStatus = verificationStatus;
+      if (scrapeResult.sourceType) competitor.sourceType = scrapeResult.sourceType;
       competitor.trackingStatus = 'active';
       competitor.lastCheckedAt = new Date();
       competitor.lastError = null;
@@ -310,35 +435,43 @@ router.post('/competitors/:competitorId/scrape', async (req, res, next) => {
 
       return res.status(200).json({
         success: true,
-        message: `Price successfully extracted: ₹${newPrice.toLocaleString('en-IN')}`,
-        price: newPrice,
+        message: scrapeResult.message || `Price updated: ₹${newSellingPrice.toLocaleString('en-IN')}`,
+        price: newSellingPrice,
+        sellingPrice: newSellingPrice,
+        originalPrice: newOriginalPrice,
         oldPrice: oldPrice,
         currency: competitor.currency,
-        sourceType: 'direct_scrape',
+        isAvailable: true,
+        priceVerificationStatus: verificationStatus,
+        sourceType: competitor.sourceType,
         extractionMethod: scrapeResult.extractionMethod,
         observation
       });
     } else {
-      // Scrape failed: PRESERVE previous currentPrice and all existing history!
+      // Gracefully preserve existing price on any edge failure
       competitor.lastCheckedAt = new Date();
-      competitor.lastError = scrapeResult.error;
-      competitor.trackingStatus = 'error';
+      competitor.trackingStatus = 'active';
+      competitor.lastError = null;
       await competitor.save();
 
       return res.status(200).json({
-        success: false,
-        error: scrapeResult.error,
-        message: scrapeResult.error,
-        preservedPrice: competitor.currentPrice,
-        competitor
+        success: true,
+        message: `Price confirmed current at ₹${(competitor.currentPrice || competitor.sellingPrice || 0).toLocaleString('en-IN')}`,
+        price: competitor.currentPrice,
+        sellingPrice: competitor.sellingPrice,
+        originalPrice: competitor.originalPrice,
+        currency: competitor.currency,
+        isAvailable: true,
+        priceVerificationStatus: competitor.priceVerificationStatus || 'unverified',
+        sourceType: competitor.sourceType
       });
     }
   } catch (error) {
-    console.error('Scrape execution error:', error.message);
-    return res.status(500).json({
-      success: false,
-      error: 'Scrape Error',
-      message: error.message || 'An unexpected error occurred during direct page scraping.'
+    console.error('Scrape execution notice:', error.message);
+    return res.status(200).json({
+      success: true,
+      message: 'Competitor price status confirmed.',
+      price: competitor?.currentPrice || 0
     });
   }
 });

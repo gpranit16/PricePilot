@@ -32,15 +32,17 @@ describe('Dynamic Pricing Engine Tests', () => {
       minMargin: 0.25
     });
 
-    // Create a linked competitor with price 850
+    // Create a linked competitor with verified price 850
     testCompetitor = await Competitor.create({
       productId: testProduct._id,
       merchantName: 'Flipkart',
       externalTitle: 'AcousticLab Studio Buds',
       url: 'https://www.flipkart.com/test-buds/p/test123',
       currentPrice: 850,
+      sellingPrice: 850,
       trackingStatus: 'active',
-      sourceType: 'search_result'
+      priceVerificationStatus: 'verified',
+      sourceType: 'direct_scrape'
     });
   });
 
@@ -124,6 +126,26 @@ describe('Dynamic Pricing Engine Tests', () => {
     assert.ok(result.explanation.includes('No active competitor'));
   });
 
+  test('calculateRecommendation rejects unverified search-result prices to protect margin integrity', () => {
+    // Competitor with unverified search result price
+    const unverifiedComp = {
+      _id: new mongoose.Types.ObjectId(),
+      merchantName: 'Flipkart (Google Shopping Search)',
+      currentPrice: 4999, // Unverified catalog MRP
+      priceVerificationStatus: 'unverified',
+      sourceType: 'search_result',
+      trackingStatus: 'active'
+    };
+
+    const result = calculateRecommendation(testProduct, [unverifiedComp], { minGrossMargin: 0.25 });
+
+    assert.equal(result.competitorPrice, null);
+    assert.equal(result.status, 'no_competitor');
+    assert.equal(result.recommendedPrice, testProduct.sellingPrice);
+    assert.ok(result.explanation.includes('unverified competitor price'));
+    assert.ok(result.explanation.includes('Scrape Now'));
+  });
+
   test('applyRounding respects rounding rules and protects safe floor', () => {
     // nearest_rupee
     assert.equal(applyRounding(899.1, 'nearest_rupee', 800), 899);
@@ -182,5 +204,124 @@ describe('Dynamic Pricing Engine Tests', () => {
     // Verify Product in MongoDB
     const updated = await Product.findById(testProduct._id);
     assert.equal(updated.sellingPrice, 800);
+  });
+
+  // 4. Enhanced Strategies & Safeguard Tests
+  test('calculateRecommendation supports maintain_margin strategy', () => {
+    const result = calculateRecommendation(
+      testProduct,
+      [testCompetitor],
+      { strategy: 'maintain_margin', targetMargin: 0.40, minGrossMargin: 0.25 }
+    );
+
+    // Cost 600, Target margin 40% -> 600 / 0.6 = 1000
+    assert.equal(result.strategy, 'maintain_margin');
+    assert.equal(result.recommendedPrice, 1000);
+    assert.equal(result.expectedMargin, 40);
+    assert.equal(result.expectedProfit, 400);
+    assert.equal(result.riskLevel, 'profitable');
+  });
+
+  test('calculateRecommendation supports premium_pricing strategy', () => {
+    // Competitor: 850, Premium: +10% -> 850 * 1.10 = 935
+    const result = calculateRecommendation(
+      testProduct,
+      [testCompetitor],
+      { strategy: 'premium_pricing', premiumType: 'percentage', premiumValue: 10 }
+    );
+
+    assert.equal(result.strategy, 'premium_pricing');
+    assert.equal(result.recommendedPrice, 935);
+    assert.equal(result.expectedProfit, 335);
+    assert.equal(result.floorApplied, false);
+  });
+
+  test('calculateRecommendation supports fixed amount undercut', () => {
+    // Competitor: 850, Fixed undercut: ₹30 -> Target 820. Floor 800.
+    const result = calculateRecommendation(
+      testProduct,
+      [testCompetitor],
+      { strategy: 'undercut_competitor', undercutType: 'fixed_amount', undercutValue: 30 }
+    );
+
+    assert.equal(result.calculatedTargetPrice, 820);
+    assert.equal(result.recommendedPrice, 820);
+    assert.equal(result.floorApplied, false);
+  });
+
+  test('calculateRecommendation ignores stale competitor prices older than threshold', () => {
+    const staleCompetitor = {
+      _id: new mongoose.Types.ObjectId(),
+      merchantName: 'Old Store',
+      sellingPrice: 700,
+      trackingStatus: 'active',
+      priceVerificationStatus: 'verified',
+      sourceType: 'direct_scrape',
+      lastCheckedAt: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000) // 15 days old
+    };
+
+    const result = calculateRecommendation(
+      testProduct,
+      [staleCompetitor],
+      { minGrossMargin: 0.25, maxPriceAgeDays: 7 }
+    );
+
+    // Stale competitor must be ignored, so status becomes no_competitor
+    assert.equal(result.status, 'no_competitor');
+    assert.ok(result.explanation.includes('older than 7 days') || result.explanation.includes('Stale prices are ignored'));
+  });
+
+  test('calculateRecommendation enforces minimum selling price bound', () => {
+    // Floor is 800, but minSellingPrice is configured to 850
+    const result = calculateRecommendation(
+      testProduct,
+      [testCompetitor],
+      { minGrossMargin: 0.25, undercutPercentage: 10, minSellingPrice: 850 }
+    );
+
+    assert.equal(result.recommendedPrice, 850);
+    assert.equal(result.floorApplied, true);
+  });
+
+  test('calculateRecommendation rejects missing or non-positive cost price', () => {
+    assert.throws(
+      () => calculateRecommendation({ costPrice: 0, sellingPrice: 999 }, []),
+      /cost price is missing or invalid/
+    );
+    assert.throws(
+      () => calculateRecommendation({ costPrice: -50, sellingPrice: 999 }, []),
+      /cost price is missing or invalid/
+    );
+  });
+
+  test('POST /api/pricing/recommendations/:productId/reject records rejection in audit history', async () => {
+    // Generate recommendation first
+    await request(app).post(`/api/pricing/recommendations/${testProduct._id}`).expect(201);
+
+    // Reject recommendation
+    const res = await request(app)
+      .post(`/api/pricing/recommendations/${testProduct._id}/reject`)
+      .send({ reason: 'Competitor offering promotional clearance' })
+      .expect(200);
+
+    assert.equal(res.body.success, true);
+    assert.equal(res.body.recommendation.status, 'rejected');
+    assert.equal(res.body.recommendation.rejectionReason, 'Competitor offering promotional clearance');
+    assert.ok(res.body.recommendation.rejectedAt);
+  });
+
+  test('GET /api/pricing/history/:productId retrieves audit trail', async () => {
+    const res = await request(app)
+      .get(`/api/pricing/history/${testProduct._id}`)
+      .expect(200);
+
+    assert.equal(res.body.success, true);
+    assert.ok(Array.isArray(res.body.history));
+    assert.ok(res.body.history.length >= 1);
+
+    const latest = res.body.history[0];
+    assert.ok(latest.productId);
+    assert.ok(latest.status);
+    assert.ok(latest.recommendedPrice);
   });
 });

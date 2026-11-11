@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 
 /**
  * PriceRecommendation Schema for PricePilot.
- * Stores generated repricing recommendations, margin projections, and audit logs.
+ * Stores generated repricing recommendations, margin projections, and full approval/rejection audit logs.
  */
 const priceRecommendationSchema = new mongoose.Schema(
   {
@@ -16,9 +16,19 @@ const priceRecommendationSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'PricingRule'
     },
+    strategy: {
+      type: String,
+      default: 'lowest_competitor'
+    },
     currentSellingPrice: {
       type: Number,
       required: true
+    },
+    previousPrice: {
+      type: Number,
+      default: function () {
+        return this.currentSellingPrice;
+      }
     },
     productCostPrice: {
       type: Number,
@@ -57,20 +67,54 @@ const priceRecommendationSchema = new mongoose.Schema(
       type: Number,
       required: true
     },
+    expectedProfit: {
+      type: Number,
+      default: function () {
+        return Math.round((this.recommendedPrice - this.productCostPrice) * 100) / 100;
+      }
+    },
+    priceDifference: {
+      type: Number,
+      default: function () {
+        return Math.round((this.recommendedPrice - this.currentSellingPrice) * 100) / 100;
+      }
+    },
+    riskLevel: {
+      type: String,
+      enum: ['profitable', 'risky', 'blocked'],
+      default: 'profitable'
+    },
     floorApplied: {
       type: Boolean,
       default: false
     },
+    boundApplied: {
+      type: String,
+      enum: ['min_bound', 'max_bound', 'none'],
+      default: 'none'
+    },
     status: {
       type: String,
-      enum: ['pending', 'approved', 'rejected', 'floor_limited', 'no_competitor'],
+      enum: ['pending', 'approved', 'rejected', 'floor_limited', 'no_competitor', 'blocked'],
       default: 'pending'
     },
     explanation: {
       type: String,
       required: true
     },
+    rejectionReason: {
+      type: String,
+      default: null
+    },
+    approvedPrice: {
+      type: Number,
+      default: null
+    },
     approvedAt: {
+      type: Date,
+      default: null
+    },
+    rejectedAt: {
       type: Date,
       default: null
     }
@@ -80,8 +124,9 @@ const priceRecommendationSchema = new mongoose.Schema(
   }
 );
 
-// Index to quickly find the latest recommendation for a product
+// Compound index for querying latest recommendation or history by product
 priceRecommendationSchema.index({ productId: 1, createdAt: -1 });
+priceRecommendationSchema.index({ status: 1, createdAt: -1 });
 
 const PriceRecommendation =
   mongoose.models.PriceRecommendation ||

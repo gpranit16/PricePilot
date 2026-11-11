@@ -1,0 +1,182 @@
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(42, 32, 44, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 120;
+  animation: fadeIn var(--transition-fast);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.modalCard {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  width: 100%;
+  max-width: 680px;
+  max-height: 85vh;
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.modalHeader {
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: #FAF2F5;
+}
+
+.modalTitleGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.modalTitle {
+  font-family: var(--font-heading);
+  font-size: 21px;
+  color: var(--text-primary);
+  line-height: 1.1;
+}
+
+.modalSubtitle {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+
+.modalCloseButton {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: color var(--transition-fast);
+}
+
+.modalCloseButton:hover {
+  color: var(--text-primary);
+}
+
+.historyList {
+  padding: 16px 22px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.historyCard {
+  background-color: var(--bg-card-subtle);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.historyHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.dateText {
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+}
+
+.statusBadge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  text-transform: capitalize;
+}
+
+.statusApproved {
+  background-color: #E8F5E9;
+  color: #2E7D32;
+  border: 1px solid #C8E6C9;
+}
+
+.statusRejected {
+  background-color: #FFEBEE;
+  color: #C62828;
+  border: 1px solid #FFCDD2;
+}
+
+.statusPending {
+  background-color: #FFF8E1;
+  color: #B78103;
+  border: 1px solid #FFE082;
+}
+
+.priceFlowRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13.5px;
+}
+
+.priceTag {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.priceArrow {
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.strategyBadge {
+  font-size: 11.5px;
+  padding: 2px 7px;
+  border-radius: var(--radius-sm);
+  background-color: rgba(123, 60, 89, 0.08);
+  color: var(--accent-primary);
+  font-weight: 500;
+}
+
+.metricsRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  padding-top: 4px;
+  border-top: 1px dashed var(--border-color);
+}
+
+.explanationText {
+  font-size: 12px;
+  color: var(--text-secondary);
+  background-color: rgba(0, 0, 0, 0.02);
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+}
+
+.emptyState {
+  padding: 40px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+

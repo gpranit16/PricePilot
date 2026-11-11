@@ -237,12 +237,21 @@ export default function CompetitorsModal({
 
                     <div className={styles.priceTagGroup}>
                       <div className={styles.currentPrice}>
-                        {comp.currentPrice
-                          ? `₹${comp.currentPrice.toLocaleString('en-IN')}`
+                        {comp.sellingPrice || comp.currentPrice
+                          ? `₹${(comp.sellingPrice || comp.currentPrice).toLocaleString('en-IN')}`
                           : '—'}
                       </div>
+                      {comp.originalPrice && comp.originalPrice > (comp.sellingPrice || comp.currentPrice) && (
+                        <div style={{ fontSize: 11, color: 'var(--text-secondary)', textDecoration: 'line-through' }}>
+                          MRP: ₹{comp.originalPrice.toLocaleString('en-IN')}
+                        </div>
+                      )}
                       <div className={styles.priceSubtext}>
-                        {isDirect ? 'Verified Page Scrape' : 'Search Result Price'}
+                        {comp.priceVerificationStatus === 'verified' || isDirect
+                          ? '✓ Verified Page Scrape'
+                          : comp.priceVerificationStatus === 'unavailable' || comp.isAvailable === false
+                          ? '⚠️ Unavailable / Out of Stock'
+                          : 'Unverified Search Result'}
                       </div>
                     </div>
                   </div>

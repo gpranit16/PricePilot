@@ -7,6 +7,8 @@ import HeaderBar from '../components/HeaderBar';
 import ProductCatalogue from '../components/ProductCatalogue';
 import CompetitorTrackingView from '../components/CompetitorTrackingView';
 import DynamicRepricingView from '../components/DynamicRepricingView';
+import AIPricingInsightsView from '../components/AIPricingInsightsView';
+import AIPricingCopilot from '../components/AIPricingCopilot';
 
 export default function DashboardPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -40,6 +42,10 @@ export default function DashboardPage() {
           {activeTab === 'catalogue' && <ProductCatalogue />}
           {activeTab === 'competitors' && <CompetitorTrackingView />}
           {activeTab === 'pricing' && <DynamicRepricingView />}
+          {activeTab === 'insights' && (
+            <AIPricingInsightsView onNavigateTab={(tab) => setActiveTab(tab)} />
+          )}
+          {activeTab === 'copilot' && <AIPricingCopilot />}
         </main>
       </div>
     </div>

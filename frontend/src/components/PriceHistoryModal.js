@@ -89,30 +89,38 @@ export default function PriceHistoryModal({ competitor, onClose }) {
                 {history.map((obs) => {
                   const isDirect = obs.sourceType === 'direct_scrape';
                   const isSearch = obs.sourceType === 'search_result';
+                  const isFailed = obs.status === 'failed';
+                  const isVerified = obs.priceVerificationStatus === 'verified';
+                  const isUnavailable = obs.priceVerificationStatus === 'unavailable';
 
                   return (
                     <tr key={obs._id}>
                       <td>
-                        <span className={styles.priceText}>
-                          ₹{(obs.price || 0).toLocaleString('en-IN')}
-                        </span>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                          <span className={styles.priceText} style={isFailed ? { color: 'var(--text-secondary)' } : {}}>
+                            {obs.sellingPrice || obs.price
+                              ? `₹${(obs.sellingPrice || obs.price).toLocaleString('en-IN')}`
+                              : '—'}
+                          </span>
+                          {obs.originalPrice && obs.originalPrice > (obs.sellingPrice || obs.price) && (
+                            <span style={{ fontSize: 11, color: 'var(--text-secondary)', textDecoration: 'line-through' }}>
+                              MRP: ₹{obs.originalPrice.toLocaleString('en-IN')}
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td>
-                        <span
-                          className={
-                            isDirect
-                              ? styles.sourceBadgeDirect
-                              : isSearch
-                              ? styles.sourceBadgeSearch
-                              : styles.sourceBadgeManual
-                          }
-                        >
-                          {isDirect
-                            ? 'Verified Scrape'
-                            : isSearch
-                            ? 'Google Shopping / SerpApi'
-                            : 'Manual Entry'}
-                        </span>
+                        {isFailed ? (
+                          <span className={styles.sourceBadgeFailed}>✕ Scrape Failed</span>
+                        ) : isVerified ? (
+                          <span className={styles.sourceBadgeDirect}>✓ Verified Scrape</span>
+                        ) : isUnavailable ? (
+                          <span className={styles.sourceBadgeUnavailable}>Unavailable / OOS</span>
+                        ) : isSearch ? (
+                          <span className={styles.sourceBadgeSearch}>Unverified (Search)</span>
+                        ) : (
+                          <span className={styles.sourceBadgeManual}>Manual Entry</span>
+                        )}
                       </td>
                       <td>
                         <span className={styles.timestamp}>
@@ -123,8 +131,8 @@ export default function PriceHistoryModal({ competitor, onClose }) {
                         </span>
                       </td>
                       <td>
-                        <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
-                          {obs.notes || 'Recorded check'}
+                        <span style={{ fontSize: 11, color: isFailed ? 'var(--status-error)' : 'var(--text-secondary)' }}>
+                          {obs.notes || (isFailed ? 'Scrape failed' : 'Recorded check')}
                         </span>
                       </td>
                     </tr>

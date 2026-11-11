@@ -4,12 +4,19 @@ require('dotenv').config({ path: path.join(__dirname, '../.env') });
 
 const app = require('./app');
 const { connectDB } = require('./config/db');
+const {
+  startPriceMonitorScheduler,
+  stopPriceMonitorScheduler
+} = require('./services/priceMonitorService');
 
 const PORT = process.env.PORT || 5000;
 
 async function startServer() {
   // Connect to MongoDB Atlas
   await connectDB();
+
+  // Start automated price monitoring scheduler
+  startPriceMonitorScheduler();
 
   // Start Express server
   const server = app.listen(PORT, () => {
@@ -20,6 +27,7 @@ async function startServer() {
   // Graceful shutdown handling
   const shutdown = async (signal) => {
     console.log(`\n🛑 Received ${signal}. Shutting down gracefully...`);
+    stopPriceMonitorScheduler();
     server.close(async () => {
       console.log('HTTP server closed.');
       try {

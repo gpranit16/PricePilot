@@ -589,3 +589,91 @@
   }
 }
 
+/* Risk / Profitability Badges */
+.profitableBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-size: 11.5px;
+  font-weight: 600;
+  background-color: #E8F5E9;
+  color: #2E7D32;
+  border: 1px solid #C8E6C9;
+}
+
+.riskyBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-size: 11.5px;
+  font-weight: 600;
+  background-color: #FFF8E1;
+  color: #B78103;
+  border: 1px solid #FFE082;
+}
+
+.blockedBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-size: 11.5px;
+  font-weight: 600;
+  background-color: #FFEBEE;
+  color: #C62828;
+  border: 1px solid #FFCDD2;
+}
+
+/* Rejection Button */
+.rejectButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: var(--radius-md);
+  font-size: 12.5px;
+  font-weight: 500;
+  background-color: transparent;
+  color: #C62828;
+  border: 1px solid rgba(198, 40, 40, 0.3);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.rejectButton:hover:not(:disabled) {
+  background-color: #FFEBEE;
+  border-color: #C62828;
+}
+
+.rejectButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.historyButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: var(--radius-md);
+  font-size: 12.5px;
+  font-weight: 500;
+  background-color: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.historyButton:hover {
+  background-color: var(--bg-card-subtle);
+  color: var(--text-primary);
+  border-color: var(--accent-primary);
+}
+
+

@@ -28,6 +28,8 @@ export default function CompetitorTrackingView() {
   // Modals
   const [historyCompetitor, setHistoryCompetitor] = useState(null);
   const [discoveryProduct, setDiscoveryProduct] = useState(null);
+  const [monitoringInfo, setMonitoringInfo] = useState(null);
+  const [isMonitoringRunning, setIsMonitoringRunning] = useState(false);
 
   const apiBase = getApiBase();
 
@@ -66,6 +68,39 @@ export default function CompetitorTrackingView() {
     fetchData();
   }, [fetchData]);
 
+  const fetchMonitoringStatus = useCallback(async () => {
+    try {
+      const res = await fetch(`${apiBase}/monitoring/status`);
+      if (res.ok) {
+        const data = await res.json();
+        setMonitoringInfo(data.monitoring);
+      }
+    } catch (e) {}
+  }, [apiBase]);
+
+  useEffect(() => {
+    fetchMonitoringStatus();
+    const interval = setInterval(fetchMonitoringStatus, 60000);
+    return () => clearInterval(interval);
+  }, [fetchMonitoringStatus]);
+
+  const handleTriggerMonitoring = async () => {
+    setIsMonitoringRunning(true);
+    try {
+      const res = await fetch(`${apiBase}/monitoring/run`, { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        alert(data.message || 'Automated price monitoring completed.');
+      }
+      await fetchData();
+      await fetchMonitoringStatus();
+    } catch (err) {
+      alert(`Monitoring check failed: ${err.message}`);
+    } finally {
+      setIsMonitoringRunning(false);
+    }
+  };
+
   // Scrape Now
   const handleScrapeNow = async (comp) => {
     setScrapingId(comp._id);
@@ -76,9 +111,9 @@ export default function CompetitorTrackingView() {
       });
       const data = await res.json();
       if (data.success) {
-        alert(`Successfully scraped: ₹${data.price.toLocaleString('en-IN')}`);
+        alert(data.message || `Price updated: ₹${data.price.toLocaleString('en-IN')}`);
       } else {
-        alert(`Scrape check notice: ${data.error || 'Failed to extract price'}`);
+        alert(`Notice: ${data.message || data.error || 'Failed to extract price'}`);
       }
       await fetchData();
     } catch (err) {
@@ -139,16 +174,33 @@ export default function CompetitorTrackingView() {
           </p>
         </div>
 
-        {products.length > 0 && (
+        <div className={styles.headerActions}>
           <button
             type="button"
-            className={styles.scrapeButton}
-            onClick={() => setDiscoveryProduct(products[0])}
+            className={styles.autoRecheckBtn}
+            onClick={handleTriggerMonitoring}
+            disabled={isMonitoringRunning}
+            title={
+              monitoringInfo?.lastRunCompletedAt
+                ? `Auto-recheck prices (Last check: ${new Date(monitoringInfo.lastRunCompletedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`
+                : 'Auto-recheck prices across all active competitors'
+            }
           >
-            <PlusIcon size={14} />
-            <span>Discover Competitors</span>
+            <RefreshIcon size={13} className={isMonitoringRunning ? styles.spinning : ''} />
+            <span>{isMonitoringRunning ? 'Rechecking...' : 'Auto-Recheck'}</span>
           </button>
-        )}
+
+          {products.length > 0 && (
+            <button
+              type="button"
+              className={styles.scrapeButton}
+              onClick={() => setDiscoveryProduct(products[0])}
+            >
+              <PlusIcon size={14} />
+              <span>Discover Competitors</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Filter and Search Bar */}
@@ -230,21 +282,34 @@ export default function CompetitorTrackingView() {
                         </td>
 
                         <td>
-                          <span className={styles.monoPrice}>
-                            {comp.currentPrice
-                              ? `₹${comp.currentPrice.toLocaleString('en-IN')}`
-                              : '—'}
-                          </span>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                            <span className={styles.monoPrice}>
+                              {comp.sellingPrice || comp.currentPrice
+                                ? `₹${(comp.sellingPrice || comp.currentPrice).toLocaleString('en-IN')}`
+                                : '—'}
+                            </span>
+                            {comp.originalPrice && comp.originalPrice > (comp.sellingPrice || comp.currentPrice) && (
+                              <span style={{ fontSize: 11, color: 'var(--text-secondary)', textDecoration: 'line-through' }}>
+                                MRP: ₹{comp.originalPrice.toLocaleString('en-IN')}
+                              </span>
+                            )}
+                          </div>
                         </td>
 
                         <td>
-                          <span
-                            className={
-                              isDirect ? styles.sourceBadgeDirect : styles.sourceBadgeSearch
-                            }
-                          >
-                            {isDirect ? 'Verified Scrape' : 'Google Shopping'}
-                          </span>
+                          {comp.priceVerificationStatus === 'verified' || comp.sourceType === 'direct_scrape' ? (
+                            <span className={styles.sourceBadgeDirect} title="Directly scraped & verified on retailer website">
+                              ✓ Verified Scrape
+                            </span>
+                          ) : comp.priceVerificationStatus === 'unavailable' || comp.isAvailable === false ? (
+                            <span className={styles.sourceBadgeUnavailable} title="Product is Out of Stock or Unavailable">
+                              Unavailable / OOS
+                            </span>
+                          ) : (
+                            <span className={styles.sourceBadgeSearch} title="Unverified search estimate (click 'Scrape Now' to verify)">
+                              Unverified (Search)
+                            </span>
+                          )}
                         </td>
 
                         <td>
@@ -349,13 +414,22 @@ export default function CompetitorTrackingView() {
                       </div>
                       <div className={styles.mobilePriceTag}>
                         <div className={styles.monoPrice}>
-                          {comp.currentPrice
-                            ? `₹${comp.currentPrice.toLocaleString('en-IN')}`
+                          {comp.sellingPrice || comp.currentPrice
+                            ? `₹${(comp.sellingPrice || comp.currentPrice).toLocaleString('en-IN')}`
                             : '—'}
                         </div>
-                        <span className={isDirect ? styles.sourceBadgeDirect : styles.sourceBadgeSearch}>
-                          {isDirect ? 'Verified' : 'Google Shopping'}
-                        </span>
+                        {comp.originalPrice && comp.originalPrice > (comp.sellingPrice || comp.currentPrice) && (
+                          <div style={{ fontSize: 10, color: 'var(--text-secondary)', textDecoration: 'line-through' }}>
+                            MRP: ₹{comp.originalPrice.toLocaleString('en-IN')}
+                          </div>
+                        )}
+                        {comp.priceVerificationStatus === 'verified' || comp.sourceType === 'direct_scrape' ? (
+                          <span className={styles.sourceBadgeDirect}>✓ Verified</span>
+                        ) : comp.priceVerificationStatus === 'unavailable' || comp.isAvailable === false ? (
+                          <span className={styles.sourceBadgeUnavailable}>Unavailable</span>
+                        ) : (
+                          <span className={styles.sourceBadgeSearch}>Unverified</span>
+                        )}
                       </div>
                     </div>
 

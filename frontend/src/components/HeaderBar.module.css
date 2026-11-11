@@ -39,6 +39,52 @@
   margin-left: auto;
 }
 
+.bellButton {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-sm, 6px);
+  border: 1px solid var(--border-color, #E5DCDE);
+  background: #FFFFFF;
+  color: var(--text-primary, #2A202C);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.bellButton:hover {
+  background-color: #F8F5F6;
+  border-color: #7B3C59;
+  color: #7B3C59;
+}
+
+.bellBadge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background-color: #C62828;
+  color: #FFFFFF;
+  font-size: 10px;
+  font-weight: 700;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  box-shadow: 0 0 0 2px #FFFFFF;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
 .statusDotItem {
   display: inline-flex;
   align-items: center;

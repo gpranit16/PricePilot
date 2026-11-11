@@ -4,6 +4,8 @@ const healthRoutes = require('./routes/healthRoutes');
 const productRoutes = require('./routes/productRoutes');
 const competitorRoutes = require('./routes/competitorRoutes');
 const pricingRoutes = require('./routes/pricingRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
+const aiRoutes = require('./routes/aiRoutes');
 
 const app = express();
 
@@ -38,7 +40,7 @@ app.use(cors({
     return callback(null, true);
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Accept']
 }));
 
@@ -51,6 +53,9 @@ app.use('/api', healthRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api', competitorRoutes);
 app.use('/api/pricing', pricingRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api', notificationRoutes);
+app.use('/api/ai', aiRoutes);
 
 // Root route for quick verification
 app.get('/', (req, res) => {

@@ -29,8 +29,16 @@ router.get('/rules/:productId', async (req, res, next) => {
       rule = {
         productId,
         minGrossMargin: product.minMargin || 0.25,
-        undercutPercentage: 5,
+        targetMargin: 0.30,
         strategy: 'lowest_competitor',
+        undercutType: 'percentage',
+        undercutValue: 5,
+        undercutPercentage: 5,
+        premiumType: 'percentage',
+        premiumValue: 5,
+        minSellingPrice: null,
+        maxSellingPrice: null,
+        maxPriceAgeDays: 7,
         roundingRule: 'nearest_rupee',
         isActive: true,
         isDefault: true
@@ -50,7 +58,21 @@ router.get('/rules/:productId', async (req, res, next) => {
 router.put('/rules/:productId', async (req, res, next) => {
   try {
     const { productId } = req.params;
-    const { minGrossMargin, undercutPercentage, strategy, roundingRule, isActive } = req.body;
+    const {
+      minGrossMargin,
+      targetMargin,
+      strategy,
+      undercutType,
+      undercutValue,
+      undercutPercentage,
+      premiumType,
+      premiumValue,
+      minSellingPrice,
+      maxSellingPrice,
+      maxPriceAgeDays,
+      roundingRule,
+      isActive
+    } = req.body;
 
     const product = await Product.findById(productId);
     if (!product) {
@@ -58,23 +80,38 @@ router.put('/rules/:productId', async (req, res, next) => {
     }
 
     let normalizedMargin;
-    let normalizedUndercut;
+    let normalizedTargetMargin;
+    let normalizedUndercutPercent;
 
     try {
       normalizedMargin = normalizeMargin(minGrossMargin !== undefined ? minGrossMargin : 0.25);
-      normalizedUndercut =
+      normalizedTargetMargin = normalizeMargin(targetMargin !== undefined ? targetMargin : 0.30);
+      normalizedUndercutPercent =
         (undercutPercentage !== undefined ? normalizeUndercut(undercutPercentage) : 0.05) * 100;
     } catch (valErr) {
       return res.status(400).json({ success: false, error: 'Validation Error', message: valErr.message });
     }
+
+    const effectiveUndercutVal =
+      undercutValue !== undefined && undercutValue !== null && !isNaN(parseFloat(undercutValue))
+        ? parseFloat(undercutValue)
+        : normalizedUndercutPercent;
 
     const rule = await PricingRule.findOneAndUpdate(
       { productId },
       {
         productId,
         minGrossMargin: normalizedMargin,
-        undercutPercentage: normalizedUndercut,
+        targetMargin: normalizedTargetMargin,
         strategy: strategy || 'lowest_competitor',
+        undercutType: undercutType || 'percentage',
+        undercutValue: effectiveUndercutVal,
+        undercutPercentage: normalizedUndercutPercent,
+        premiumType: premiumType || 'percentage',
+        premiumValue: typeof premiumValue === 'number' && premiumValue > 0 ? premiumValue : 5,
+        minSellingPrice: typeof minSellingPrice === 'number' && minSellingPrice > 0 ? minSellingPrice : null,
+        maxSellingPrice: typeof maxSellingPrice === 'number' && maxSellingPrice > 0 ? maxSellingPrice : null,
+        maxPriceAgeDays: typeof maxPriceAgeDays === 'number' && maxPriceAgeDays > 0 ? maxPriceAgeDays : 7,
         roundingRule: roundingRule || 'nearest_rupee',
         isActive: isActive !== undefined ? Boolean(isActive) : true
       },
@@ -105,6 +142,7 @@ router.post('/recommendations/:productId', async (req, res, next) => {
 
     const rule = (await PricingRule.findOne({ productId })) || {
       minGrossMargin: product.minMargin || 0.25,
+      targetMargin: 0.30,
       undercutPercentage: 5,
       strategy: 'lowest_competitor',
       roundingRule: 'nearest_rupee'
@@ -127,7 +165,9 @@ router.post('/recommendations/:productId', async (req, res, next) => {
     const recommendation = await PriceRecommendation.create({
       productId,
       pricingRuleId: rule._id || null,
+      strategy: recData.strategy || rule.strategy || 'lowest_competitor',
       currentSellingPrice: recData.currentSellingPrice,
+      previousPrice: recData.currentSellingPrice,
       productCostPrice: recData.productCostPrice,
       minimumSafePrice: recData.minimumSafePrice,
       competitorPrice: recData.competitorPrice,
@@ -137,7 +177,11 @@ router.post('/recommendations/:productId', async (req, res, next) => {
       calculatedTargetPrice: recData.calculatedTargetPrice,
       recommendedPrice: recData.recommendedPrice,
       expectedMargin: recData.expectedMargin,
+      expectedProfit: recData.expectedProfit,
+      priceDifference: recData.priceDifference,
+      riskLevel: recData.riskLevel,
       floorApplied: recData.floorApplied,
+      boundApplied: recData.boundApplied,
       status: recData.status,
       explanation: recData.explanation
     });
@@ -193,7 +237,6 @@ router.get('/recommendations', async (req, res, next) => {
     const results = [];
 
     for (const prod of products) {
-      // Find latest recommendation
       let rec = await PriceRecommendation.findOne({ productId: prod._id }).sort({
         createdAt: -1
       });
@@ -202,6 +245,7 @@ router.get('/recommendations', async (req, res, next) => {
       if (!rec) {
         const rule = (await PricingRule.findOne({ productId: prod._id })) || {
           minGrossMargin: prod.minMargin || 0.25,
+          targetMargin: 0.30,
           undercutPercentage: 5,
           strategy: 'lowest_competitor',
           roundingRule: 'nearest_rupee'
@@ -213,7 +257,9 @@ router.get('/recommendations', async (req, res, next) => {
           rec = await PriceRecommendation.create({
             productId: prod._id,
             pricingRuleId: rule._id || null,
+            strategy: recData.strategy || rule.strategy || 'lowest_competitor',
             currentSellingPrice: recData.currentSellingPrice,
+            previousPrice: recData.currentSellingPrice,
             productCostPrice: recData.productCostPrice,
             minimumSafePrice: recData.minimumSafePrice,
             competitorPrice: recData.competitorPrice,
@@ -223,7 +269,11 @@ router.get('/recommendations', async (req, res, next) => {
             calculatedTargetPrice: recData.calculatedTargetPrice,
             recommendedPrice: recData.recommendedPrice,
             expectedMargin: recData.expectedMargin,
+            expectedProfit: recData.expectedProfit,
+            priceDifference: recData.priceDifference,
+            riskLevel: recData.riskLevel,
             floorApplied: recData.floorApplied,
+            boundApplied: recData.boundApplied,
             status: recData.status,
             explanation: recData.explanation
           });
@@ -288,8 +338,10 @@ router.post('/recommendations/:productId/approve', async (req, res, next) => {
     product.sellingPrice = recommendation.recommendedPrice;
     await product.save();
 
-    // Mark recommendation as approved
+    // Mark recommendation as approved in audit log
     recommendation.status = 'approved';
+    recommendation.approvedPrice = recommendation.recommendedPrice;
+    recommendation.previousPrice = previousPrice;
     recommendation.approvedAt = new Date();
     await recommendation.save();
 
@@ -298,6 +350,95 @@ router.post('/recommendations/:productId/approve', async (req, res, next) => {
       message: `Price updated from ₹${previousPrice.toLocaleString('en-IN')} to ₹${product.sellingPrice.toLocaleString('en-IN')}.`,
       product,
       recommendation
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /api/pricing/recommendations/:productId/reject
+ * Explicitly rejects a recommendation and records audit trail.
+ */
+router.post('/recommendations/:productId/reject', async (req, res, next) => {
+  try {
+    const { productId } = req.params;
+    const { reason } = req.body || {};
+
+    const recommendation = await PriceRecommendation.findOne({ productId }).sort({
+      createdAt: -1
+    });
+
+    if (!recommendation) {
+      return res.status(404).json({
+        success: false,
+        error: 'No Recommendation Found',
+        message: 'No recommendation found to reject.'
+      });
+    }
+
+    recommendation.status = 'rejected';
+    recommendation.rejectedAt = new Date();
+    recommendation.rejectionReason = reason || 'Rejected by merchant';
+    await recommendation.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Price recommendation was rejected.',
+      recommendation
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * GET /api/pricing/history/:productId
+ * Retrieves full auditable pricing and recommendation history for a specific product.
+ */
+router.get('/history/:productId', async (req, res, next) => {
+  try {
+    const { productId } = req.params;
+    const history = await PriceRecommendation.find({ productId })
+      .sort({ createdAt: -1 })
+      .limit(50)
+      .populate('productId', 'name sku brand costPrice sellingPrice')
+      .lean();
+
+    return res.status(200).json({
+      success: true,
+      count: history.length,
+      history
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * GET /api/pricing/history
+ * Retrieves global audit trail of price changes and recommendations.
+ */
+router.get('/history', async (req, res, next) => {
+  try {
+    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 100);
+
+    const total = await PriceRecommendation.countDocuments();
+    const history = await PriceRecommendation.find()
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .populate('productId', 'name sku brand costPrice sellingPrice')
+      .lean();
+
+    return res.status(200).json({
+      success: true,
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit) || 1,
+      history
     });
   } catch (err) {
     next(err);

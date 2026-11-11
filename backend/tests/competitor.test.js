@@ -105,6 +105,7 @@ describe('Competitor Tracking & Scraping API Tests', () => {
     assert.equal(res.body.success, true);
     assert.equal(res.body.competitor.merchantName, 'Croma Retail');
     assert.equal(res.body.competitor.currentPrice, 11990);
+    assert.equal(res.body.competitor.priceVerificationStatus, 'unverified');
 
     // Verify price history was automatically recorded
     const historyRes = await request(app)
@@ -115,6 +116,7 @@ describe('Competitor Tracking & Scraping API Tests', () => {
     assert.equal(historyRes.body.count, 1);
     assert.equal(historyRes.body.history[0].price, 11990);
     assert.equal(historyRes.body.history[0].sourceType, 'search_result');
+    assert.equal(historyRes.body.history[0].priceVerificationStatus, 'unverified');
   });
 
   test('POST /api/products/:productId/competitors rejects duplicate URL for same product', async () => {

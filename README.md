@@ -93,6 +93,13 @@ $$\text{Minimum Safe Price } (P_{min}) = \frac{\text{Product Cost } (C)}{1 - \te
    * `NODE_ENV` = `production`
    * `MONGODB_URI` = `mongodb+srv://<user>:<password>@cluster0.tc2g7fs.mongodb.net/pricepilot?retryWrites=true&w=majority`
    * `SERPAPI_API_KEY` = `<your-serpapi-key>`
+   * `GEMINI_API_KEY` = `<your-gemini-api-key>`
+   * `GEMINI_MODEL` = `gemini-3.8-flash`
+   * `AI_ENABLED` = `true`
+   * `AI_MAX_MATCH_CANDIDATES` = `5`
+   * `AI_REQUEST_TIMEOUT_MS` = `15000`
+   * `AI_DAILY_REQUEST_LIMIT` = `100`
+   * `PRICE_MONITOR_INTERVAL_MINUTES` = `360`
    * `CORS_ORIGIN` = `*` (or your Vercel domain once deployed)
 5. Click **Create Web Service**. Note your Render service URL (e.g., `https://pricepilot-backend.onrender.com`).
 

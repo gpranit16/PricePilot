@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 
 /**
  * PricingRule Schema for PricePilot.
- * Defines automated repricing parameters (gross margin floor, competitor undercut %, rounding).
+ * Defines automated repricing parameters (gross margin floor, strategy, undercut/premium, min/max bounds, rounding).
  */
 const pricingRuleSchema = new mongoose.Schema(
   {
@@ -20,17 +20,63 @@ const pricingRuleSchema = new mongoose.Schema(
       min: [0, 'Minimum gross margin cannot be negative'],
       max: [0.95, 'Minimum gross margin must be less than 95%']
     },
-    undercutPercentage: {
+    targetMargin: {
       type: Number,
-      required: [true, 'Undercut percentage is required'],
-      default: 5, // 5% default undercut
-      min: [0, 'Undercut percentage cannot be negative'],
-      max: [90, 'Undercut percentage cannot exceed 90%']
+      default: 0.30, // 30% default target margin for maintain_margin strategy
+      min: [0, 'Target gross margin cannot be negative'],
+      max: [0.95, 'Target gross margin must be less than 95%']
     },
     strategy: {
       type: String,
-      enum: ['lowest_competitor', 'match_competitor', 'average_competitor'],
+      enum: [
+        'lowest_competitor',
+        'undercut_competitor',
+        'match_competitor',
+        'maintain_margin',
+        'premium_pricing'
+      ],
       default: 'lowest_competitor'
+    },
+    undercutType: {
+      type: String,
+      enum: ['percentage', 'fixed_amount'],
+      default: 'percentage'
+    },
+    undercutValue: {
+      type: Number,
+      default: 5,
+      min: [0, 'Undercut value cannot be negative']
+    },
+    undercutPercentage: {
+      type: Number,
+      default: 5,
+      min: [0, 'Undercut percentage cannot be negative'],
+      max: [90, 'Undercut percentage cannot exceed 90%']
+    },
+    premiumType: {
+      type: String,
+      enum: ['percentage', 'fixed_amount'],
+      default: 'percentage'
+    },
+    premiumValue: {
+      type: Number,
+      default: 5,
+      min: [0, 'Premium value cannot be negative']
+    },
+    minSellingPrice: {
+      type: Number,
+      default: null,
+      min: [0, 'Minimum selling price cannot be negative']
+    },
+    maxSellingPrice: {
+      type: Number,
+      default: null,
+      min: [0, 'Maximum selling price cannot be negative']
+    },
+    maxPriceAgeDays: {
+      type: Number,
+      default: 7, // Stale price threshold in days
+      min: [1, 'Price age must be at least 1 day']
     },
     roundingRule: {
       type: String,

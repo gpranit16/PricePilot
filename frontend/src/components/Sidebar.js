@@ -2,7 +2,7 @@
 
 import React from 'react';
 import styles from './Sidebar.module.css';
-import { CatalogueIcon, CompetitorIcon, PricingIcon, CloseIcon } from './Icons';
+import { CatalogueIcon, CompetitorIcon, PricingIcon, CloseIcon, InsightsIcon, SparklesIcon } from './Icons';
 
 export default function Sidebar({ isOpen, onClose, activeTab = 'catalogue', onSelectTab }) {
   const handleNav = (tab) => {
@@ -56,6 +56,26 @@ export default function Sidebar({ isOpen, onClose, activeTab = 'catalogue', onSe
         >
           <PricingIcon size={16} />
           <span>Dynamic Repricing</span>
+        </button>
+
+        <button
+          type="button"
+          className={`${styles.navItem} ${activeTab === 'insights' ? styles.navItemActive : ''}`}
+          onClick={() => handleNav('insights')}
+          aria-current={activeTab === 'insights' ? 'page' : undefined}
+        >
+          <InsightsIcon size={16} />
+          <span>AI Pricing Insights</span>
+        </button>
+
+        <button
+          type="button"
+          className={`${styles.navItem} ${activeTab === 'copilot' ? styles.navItemActive : ''}`}
+          onClick={() => handleNav('copilot')}
+          aria-current={activeTab === 'copilot' ? 'page' : undefined}
+        >
+          <SparklesIcon size={16} color="var(--accent-primary)" />
+          <span>AI Pricing Copilot</span>
         </button>
       </nav>
     </aside>

@@ -12,6 +12,7 @@ import {
   ImageIcon
 } from './Icons';
 import PricingRuleModal from './PricingRuleModal';
+import PricingHistoryModal from './PricingHistoryModal';
 import { getApiBase } from '../utils/api';
 
 /**
@@ -35,8 +36,10 @@ export default function DynamicRepricingView() {
   const [isLoading, setIsLoading] = useState(true);
   const [recalculatingId, setRecalculatingId] = useState(null);
   const [approvingId, setApprovingId] = useState(null);
+  const [rejectingId, setRejectingId] = useState(null);
   const [feedbackMessage, setFeedbackMessage] = useState(null);
   const [configuringProduct, setConfiguringProduct] = useState(null);
+  const [historyProduct, setHistoryProduct] = useState(null);
 
   const apiBase = getApiBase();
 
@@ -117,6 +120,42 @@ export default function DynamicRepricingView() {
       });
     } finally {
       setApprovingId(null);
+    }
+  };
+
+  // Reject recommendation
+  const handleReject = async (productId) => {
+    const reason = prompt('Optional reason for rejecting this recommendation:') || '';
+    setRejectingId(productId);
+    setFeedbackMessage(null);
+
+    try {
+      const res = await fetch(`${apiBase}/pricing/recommendations/${productId}/reject`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json'
+        },
+        body: JSON.stringify({ reason })
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || 'Rejection failed');
+      }
+
+      setFeedbackMessage({
+        type: 'success',
+        text: 'Recommendation was rejected and recorded in pricing history.'
+      });
+      await fetchRecommendations();
+    } catch (err) {
+      setFeedbackMessage({
+        type: 'error',
+        text: err.message || 'Failed to reject recommendation'
+      });
+    } finally {
+      setRejectingId(null);
     }
   };
 
@@ -220,17 +259,21 @@ export default function DynamicRepricingView() {
           filteredItems.map(({ product, recommendation }) => {
             const isRecalculating = recalculatingId === product._id;
             const isApproving = approvingId === product._id;
+            const isRejecting = rejectingId === product._id;
             const rec = recommendation || {};
             const cleanSku = formatSku(product.sku);
 
             const isFloorApplied = Boolean(rec.floorApplied);
             const isApproved = rec.status === 'approved';
+            const isRejected = rec.status === 'rejected';
             const isNoCompetitor = rec.status === 'no_competitor';
 
             const priceDiff =
               rec.recommendedPrice && product.sellingPrice
                 ? rec.recommendedPrice - product.sellingPrice
                 : 0;
+
+            const riskLevel = rec.riskLevel || (isFloorApplied ? 'blocked' : 'profitable');
 
             return (
               <div
@@ -275,22 +318,26 @@ export default function DynamicRepricingView() {
                     </div>
                   </div>
 
-                  {/* Status Badge */}
+                  {/* Status & Risk Badges */}
                   <div className={styles.statusGroup}>
-                    {isFloorApplied ? (
-                      <span className={styles.floorBadge}>
-                        <ShieldIcon size={13} />
-                        <span>Margin Floor Enforced</span>
-                      </span>
-                    ) : isApproved ? (
+                    {isApproved ? (
                       <span className={styles.approvedBadge}>
                         <CheckCircleIcon size={13} />
                         <span>Approved Price</span>
                       </span>
+                    ) : isRejected ? (
+                      <span className={styles.blockedBadge}>Rejected</span>
+                    ) : isFloorApplied ? (
+                      <span className={styles.blockedBadge}>
+                        <ShieldIcon size={13} />
+                        <span>Margin Floor Enforced</span>
+                      </span>
+                    ) : riskLevel === 'risky' ? (
+                      <span className={styles.riskyBadge}>⚠️ Risky Margin</span>
                     ) : isNoCompetitor ? (
                       <span className={styles.noCompBadge}>No Competitor Data</span>
                     ) : (
-                      <span className={styles.pendingBadge}>Recommendation Ready</span>
+                      <span className={styles.profitableBadge}>✓ Profitable</span>
                     )}
                   </div>
                 </div>
@@ -317,14 +364,16 @@ export default function DynamicRepricingView() {
 
                   {/* Competitor Benchmark Price */}
                   <div className={styles.metricBlock}>
-                    <span className={styles.metricLabel}>Competitor Price</span>
+                    <span className={styles.metricLabel}>
+                      {rec.competitorPrice ? 'Verified Competitor' : 'Competitor Price'}
+                    </span>
                     <span className={styles.metricValue}>
                       {rec.competitorPrice
                         ? `₹${rec.competitorPrice.toLocaleString('en-IN')}`
                         : '—'}
                     </span>
                     <span className={styles.metricSub}>
-                      {rec.competitorName ? `${rec.competitorName}` : 'No active competitor'}
+                      {rec.competitorName ? `${rec.competitorName} (Verified)` : 'No verified competitor'}
                     </span>
                   </div>
 
@@ -336,6 +385,24 @@ export default function DynamicRepricingView() {
                     </span>
                     <span className={styles.metricSub}>
                       {((product.minMargin || 0.25) * 100).toFixed(0)}% Min Margin
+                    </span>
+                  </div>
+
+                  {/* Expected Profit */}
+                  <div className={styles.metricBlock}>
+                    <span className={styles.metricLabel}>Expected Profit</span>
+                    <span
+                      className={styles.metricValue}
+                      style={{
+                        color: (rec.expectedProfit || 0) > 0 ? '#2E7D32' : 'inherit'
+                      }}
+                    >
+                      {rec.expectedProfit !== undefined && rec.expectedProfit !== null
+                        ? `₹${rec.expectedProfit.toLocaleString('en-IN')}`
+                        : '—'}
+                    </span>
+                    <span className={styles.metricSub}>
+                      Margin: {rec.expectedMargin !== undefined ? `${rec.expectedMargin}%` : '—'}
                     </span>
                   </div>
 
@@ -358,7 +425,7 @@ export default function DynamicRepricingView() {
                       )}
                     </div>
                     <span className={styles.metricSubHighlight}>
-                      Expected Margin: {rec.expectedMargin || 0}%
+                      Status: {rec.status || 'Ready'}
                     </span>
                   </div>
                 </div>
@@ -373,15 +440,26 @@ export default function DynamicRepricingView() {
 
                 {/* Action Buttons Row */}
                 <div className={styles.cardActions}>
-                  <button
-                    type="button"
-                    className={styles.ruleConfigButton}
-                    onClick={() => setConfiguringProduct(product)}
-                    title="Configure margin floor and undercut percentage"
-                  >
-                    <SlidersIcon size={14} />
-                    <span>Configure Rule</span>
-                  </button>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                      type="button"
+                      className={styles.ruleConfigButton}
+                      onClick={() => setConfiguringProduct(product)}
+                      title="Configure margin floor and strategy"
+                    >
+                      <SlidersIcon size={14} />
+                      <span>Configure Rule</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className={styles.historyButton}
+                      onClick={() => setHistoryProduct(product)}
+                      title="View pricing decision and audit history"
+                    >
+                      <span>History</span>
+                    </button>
+                  </div>
 
                   <div className={styles.actionButtonGroup}>
                     <button
@@ -393,6 +471,16 @@ export default function DynamicRepricingView() {
                     >
                       <RefreshIcon size={13} />
                       <span>{isRecalculating ? 'Calculating...' : 'Recalculate'}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className={styles.rejectButton}
+                      onClick={() => handleReject(product._id)}
+                      disabled={isRejecting || isApproved || isRejected || isNoCompetitor}
+                      title="Reject this recommendation"
+                    >
+                      <span>{isRejecting ? 'Rejecting...' : 'Reject'}</span>
                     </button>
 
                     <button
@@ -425,6 +513,14 @@ export default function DynamicRepricingView() {
           onRuleSaved={() => {
             fetchRecommendations();
           }}
+        />
+      )}
+
+      {/* Pricing Decision History Modal */}
+      {historyProduct && (
+        <PricingHistoryModal
+          product={historyProduct}
+          onClose={() => setHistoryProduct(null)}
         />
       )}
     </div>
